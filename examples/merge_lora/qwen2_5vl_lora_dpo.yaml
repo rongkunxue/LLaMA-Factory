@@ -2,12 +2,12 @@
 
 ### model
 model_name_or_path: /mnt/bn/yanmengbei/content_AB_exp/qwen_easy_hard_all_distill_sft_dapo_40step_0429/global_step_220/actor/huggingface
-adapter_name_or_path: save/qwen2_5vl-7b/lora/dpo/checkpoint-182
+adapter_name_or_path: save/qwen2_5vl-7b/lora/dpo/checkpoint-32
 template: qwen2_vl
 trust_remote_code: true
 
 ### export
-export_dir: output/qwen2_5vl_lora_sft
+export_dir: /mnt/bn/gne-distill-r1/xrk_result/model/dpo_32
 export_size: 5
 export_device: cpu  # choices: [cpu, auto]
 export_legacy_format: false

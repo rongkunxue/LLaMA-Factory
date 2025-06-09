@@ -1,1 +1,3 @@
-DISABLE_VERSION_CHECK=1 WANDB_PROJECT=omni_7b_dpo_xrk torchrun --node_rank=$ARNOLD_ID --nproc_per_node=$ARNOLD_WORKER_GPU --nnodes=$ARNOLD_WORKER_NUM --rdzv_endpoint=$ARNOLD_WORKER_0_HOST:$ARNOLD_WORKER_0_PORT src/llamafactory/launcher.py /mnt/bn/evalonly/LLaMA-Factory/examples/train_lora/a.yaml
+DISABLE_VERSION_CHECK=1 WANDB_PROJECT=omni_7b_dpo_xrk torchrun --node_rank=$ARNOLD_ID --nproc_per_node=$ARNOLD_WORKER_GPU --nnodes=$ARNOLD_WORKER_NUM --rdzv_endpoint=$ARNOLD_WORKER_0_HOST:$ARNOLD_WORKER_0_PORT src/llamafactory/launcher.py /mnt/bn/evalonly/LLaMA-Factory/examples/train_lora/product_lora_dpo_7B_lora.yaml
+llamafactory-cli train /mnt/bn/evalonly/LLaMA-Factory/examples/train_lora/product_lora_dpo_7B_lora.yaml
+cd /mnt/bn/evalonly/LLaMA-Factory

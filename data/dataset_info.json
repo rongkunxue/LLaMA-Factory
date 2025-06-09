@@ -19,6 +19,17 @@
       "images": "images"
     }
   },
+  "product_dpo":{
+    "file_name": "/mnt/bn/evalonly/xrk/Traindata/product/scoreresult_dpo_yg.json",
+    "formatting": "sharegpt",
+    "ranking": true,
+    "columns": {
+      "messages": "conversations",
+      "chosen": "chosen",
+      "rejected": "rejected",
+      "images": "images"
+    }
+  },
   "glaive_toolcall_en_demo": {
     "file_name": "glaive_toolcall_en_demo.json",
     "formatting": "sharegpt",

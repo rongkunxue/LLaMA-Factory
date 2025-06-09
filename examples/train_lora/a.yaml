@@ -8,6 +8,7 @@ model_name_or_path: /mnt/bn/yanmengbei/content_AB_exp/qwen_easy_hard_all_distill
 image_max_pixels: 25088
 video_max_pixels: 16384
 
+
 ### method
 stage: dpo
 pref_beta: 0.1
@@ -21,16 +22,16 @@ freeze_vision_tower: true  # choices: [true, false]
 freeze_multi_modal_projector: true  # choices: [true, false]
 freeze_language_model: false  # choices: [true, false]
 deepspeed: examples/deepspeed/ds_z3_offload_config.json  # choices: [ds_z0_config.json, ds_z2_config.json, ds_z3_config.json]
-enable_liger_kernel: True
 
 ### dataset
 dataset: scoreresult_dpo
 template: qwen2_vl
-cutoff_len: 4600
+cutoff_len: 6000
 #max_samples: 1000
 overwrite_cache: true
 preprocessing_num_workers: 2
 dataloader_num_workers: 4
+
 
 ### output
 output_dir: /mnt/bn/evalonly/LLaMA-Factory/save/qwen2_5vl-7b/lora/dpo
@@ -51,4 +52,3 @@ warmup_ratio: 0.1
 bf16: true
 ddp_timeout: 180000000
 resume_from_checkpoint: null
-

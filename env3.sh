@@ -24,9 +24,9 @@ pip3 install flash-attn==2.7.0.post2 --no-build-isolation
 DS_BUILD_CPU_ADAM=1 pip3 install deepspeed==0.14.4
 
 pip3 install accelerate==0.34.0
-
-cp -r /mnt/bn/valley2/xrk/train_dpo.yaml /mnt/bn/evalonly/LLaMA-Factory/examples/train_lora/a.yaml
-cp -r /mnt/bn/gne-distill-r1/xrk_result/dpo_grpo_test_smaple_dpo/scoreresult_dpo.json /mnt/bn/evalonly/LLaMA-Factory/data/scoreresult_dpo.json
-cp -r /opt/tiger/EasyR1/DPO/LLaMA-Factory/data/dataset_info.json /mnt/bn/evalonly/LLaMA-Factory/data/dataset_info.json
+pip3 install liger_kernel
+#cp -r /mnt/bn/valley2/xrk/train_dpo.yaml /mnt/bn/evalonly/LLaMA-Factory/examples/train_lora/a.yaml
+#cp -r /mnt/bn/gne-distill-r1/xrk_result/dpo_grpo_test_smaple_dpo/scoreresult_dpo.json /mnt/bn/evalonly/LLaMA-Factory/data/scoreresult_dpo.json
+#cp -r /opt/tiger/EasyR1/DPO/LLaMA-Factory/data/dataset_info.json /mnt/bn/evalonly/LLaMA-Factory/data/dataset_info.json
 #llamafactory-cli train /opt/tiger/EasyR1/DPO/LLaMA-Factory/examples/train_lora/a.yaml
 
