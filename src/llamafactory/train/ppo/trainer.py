@@ -59,6 +59,80 @@ if TYPE_CHECKING:
 
 
 logger = logging.get_logger(__name__)
+import json
+import os
+from types import MethodType
+from typing import TYPE_CHECKING, Optional, Union
+
+import torch
+from transformers import Trainer
+from typing_extensions import override
+
+from ...extras import logging
+from ...extras.packages import is_transformers_version_greater_than
+from ..callbacks import FixValueHeadModelCallback, SaveProcessorCallback
+from ..trainer_utils import create_custom_optimizer, create_custom_scheduler
+
+
+if TYPE_CHECKING:
+    from transformers import PreTrainedModel, ProcessorMixin
+    from transformers.trainer import PredictionOutput
+
+    from ...hparams import FinetuningArguments
+
+
+logger = logging.get_logger(__name__)
+
+class RminferenceTrainer(Trainer):
+    def __init__(
+        self, finetuning_args: "FinetuningArguments", processor: Optional["ProcessorMixin"], **kwargs
+    ) -> None:
+        if is_transformers_version_greater_than("4.46"):
+            kwargs["processing_class"] = kwargs.pop("tokenizer")
+        super().__init__(**kwargs)
+        self.model_accepts_loss_kwargs = False  # overwrite trainer's default behavior
+        self.finetuning_args = finetuning_args
+        self.can_return_loss = True  # override property to return eval_loss
+        self.add_callback(FixValueHeadModelCallback)
+        if processor is not None:
+            self.add_callback(SaveProcessorCallback(processor))
+
+        if finetuning_args.use_badam:
+            from badam import BAdamCallback, clip_grad_norm_old_version  # type: ignore
+
+            self.accelerator.clip_grad_norm_ = MethodType(clip_grad_norm_old_version, self.accelerator)
+            self.add_callback(BAdamCallback)
+    
+    def prediction_step(
+        self,
+        model,
+        inputs,
+        prediction_loss_only: bool,
+        ignore_keys=None,
+    ):
+        model.eval()
+
+        with torch.no_grad():
+            inference_inputs = {
+                "input_ids":      inputs["input_ids"],
+                "attention_mask": inputs["attention_mask"],
+                "pixel_values": inputs["pixel_values"],
+                "image_grid_thw": inputs["image_grid_thw"],
+            }
+            outputs = model(**inference_inputs, output_hidden_states=True, return_dict=True, use_cache=False)
+            outputs_1 = outputs[2] #torch.Size([8, 421])
+            last_token_index = inference_inputs["attention_mask"].sum(-1, keepdim=True) - 1 # last_token_index.shape torch.Size([8, 1])
+            values = outputs_1.gather(dim=-1, index=last_token_index)
+
+            decoded_inputs = self.tokenizer.batch_decode(
+                inference_inputs["input_ids"],
+                skip_special_tokens=True,
+                clean_up_tokenization_spaces=True,
+            ) 
+            #values
+            #decoded_inputs
+            
+        return (None, values,None )
 
 
 class CustomPPOTrainer(PPOTrainer, Trainer):

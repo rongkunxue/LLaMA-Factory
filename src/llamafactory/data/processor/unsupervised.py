@@ -54,6 +54,7 @@ class UnsupervisedDatasetProcessor(DatasetProcessor):
         source_len, target_len = infer_seqlen(len(input_ids), len(labels), self.data_args.cutoff_len)
         input_ids = input_ids[:source_len]
         labels = labels[:target_len]
+        input_ids = input_ids+labels
         return input_ids, labels
 
     def preprocess_dataset(self, examples: dict[str, list[Any]]) -> dict[str, list[Any]]:

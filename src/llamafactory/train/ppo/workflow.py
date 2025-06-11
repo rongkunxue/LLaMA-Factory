@@ -16,14 +16,17 @@
 # limitations under the License.
 
 from typing import TYPE_CHECKING, Optional
-
-from ...data import MultiModalDataCollatorForSeq2Seq, get_dataset, get_template_and_fix_tokenizer
+from torch.utils.data import DataLoader
+from torch.optim import AdamW
+from ...data import RMinference, get_dataset, get_template_and_fix_tokenizer
 from ...extras.ploting import plot_loss
 from ...model import load_model, load_tokenizer
 from ..callbacks import fix_valuehead_checkpoint
 from ..trainer_utils import create_ref_model, create_reward_model
-from .trainer import CustomPPOTrainer
-
+from .trainer import CustomPPOTrainer,RminferenceTrainer
+from tqdm.auto import tqdm
+from accelerate import Accelerator
+import torch
 
 if TYPE_CHECKING:
     from transformers import Seq2SeqTrainingArguments, TrainerCallback
@@ -39,41 +42,119 @@ def run_ppo(
     generating_args: "GeneratingArguments",
     callbacks: Optional[list["TrainerCallback"]] = None,
 ):
-    tokenizer_module = load_tokenizer(model_args)
-    tokenizer = tokenizer_module["tokenizer"]
-    template = get_template_and_fix_tokenizer(tokenizer, data_args)
-    dataset_module = get_dataset(template, model_args, data_args, training_args, stage="ppo", **tokenizer_module)
-    model = load_model(tokenizer, model_args, finetuning_args, training_args.do_train, add_valuehead=True)
+    #tokenizer_module = load_tokenizer(model_args)
+    #tokenizer = tokenizer_module["tokenizer"]
+    #template = get_template_and_fix_tokenizer(tokenizer, data_args)
+    #dataset_module = get_dataset(template, model_args, data_args, training_args, stage="ppo", **tokenizer_module)
+    #model = load_model(tokenizer, model_args, finetuning_args, training_args.do_train, add_valuehead=True)
 
-    tokenizer.padding_side = "left"  # use left-padding in generation while using right-padding in training
-    data_collator = MultiModalDataCollatorForSeq2Seq(template=template, model=model, **tokenizer_module)
+    #tokenizer.padding_side = "left"  # use left-padding in generation while using right-padding in training
+    #data_collator = MultiModalDataCollatorForSeq2Seq(template=template, model=model, **tokenizer_module)
 
     # Create reference model and reward model
-    ref_model = create_ref_model(model_args, finetuning_args, add_valuehead=True)
-    reward_model = create_reward_model(model, model_args, finetuning_args)
+    #ref_model = create_ref_model(model_args, finetuning_args, add_valuehead=True)
+    #tokenizer.padding_side = "left"  # use left-padding in generation while using right-padding in training
+    model = None
+    tokenizer_module,tokenizer,reward_model = create_reward_model(model, model_args, finetuning_args)
+    template = get_template_and_fix_tokenizer(tokenizer, data_args)
+    #dataset_module = get_dataset(template, model_args, data_args, training_args, stage="ppo", **tokenizer_module)
+    data_collator = RMinference(template=template, model=model, **tokenizer_module)
+
+
+    def get_dataset_module_with_idx(*args, **kwargs):
+        dm = get_dataset(*args, **kwargs)  # 你的原接口
+        # dm 里通常有 'train_dataset' 和 'eval_dataset'
+        dm["train_dataset"] = add_idx(dm["train_dataset"])
+        return dm
+    def add_idx(ds):
+    # ds: Dataset 或 IterableDataset
+    # with_indices=True 会把当前样本在这个 split 里的位置当 idx 传进来
+        return ds.map(lambda example, idx: {"idx": idx}, with_indices=True)
+    dataset_module = get_dataset_module_with_idx(template, model_args, data_args, training_args, stage="ppo", **tokenizer_module)
+    
+    import os
+    import debugpy
 
     # Initialize our Trainer
-    ppo_trainer: CustomPPOTrainer = CustomPPOTrainer(
-        model_args=model_args,
-        training_args=training_args,
+
+    trainer = RminferenceTrainer(
+        model=reward_model,
+        args=training_args,
         finetuning_args=finetuning_args,
-        generating_args=generating_args,
-        callbacks=callbacks,
-        model=model,
-        reward_model=reward_model,
-        ref_model=ref_model,
         data_collator=data_collator,
+        callbacks=callbacks,
         **dataset_module,
         **tokenizer_module,
     )
 
-    # Training
-    if training_args.do_train:
-        ppo_trainer.ppo_train(resume_from_checkpoint=training_args.resume_from_checkpoint)
-        ppo_trainer.save_model()
-        if training_args.should_save:
-            fix_valuehead_checkpoint(model, training_args.output_dir, training_args.save_safetensors)
+    
 
-        ppo_trainer.save_state()  # must be called after save_model to have a folder
-        if ppo_trainer.is_world_process_zero() and finetuning_args.plot_loss:
-            plot_loss(training_args.output_dir, keys=["loss", "reward"])
+    accelerator = trainer.accelerator   
+    train_dataset = dataset_module["train_dataset"]
+
+    dataloader = DataLoader(
+        train_dataset,
+        batch_size=8,
+        collate_fn=data_collator,
+        num_workers=16,
+        pin_memory=True,
+        drop_last=False,
+        shuffle=False
+    )
+    model = reward_model
+
+    model, dataloader = accelerator.prepare(model, dataloader)
+
+    import json
+    from tqdm import tqdm
+
+    model.eval()
+    records = []                      # 用于最终保存，每元素 = {"text": str, "reward": float}
+    total_batches = len(dataloader)
+    all_reward=[]
+    all_input_ids = []
+    decoded_inputs_list=[]
+    for step, batch in enumerate(tqdm(dataloader, disable=not accelerator.is_main_process), start=1):
+        with torch.no_grad():
+            inference_inputs = {
+                "input_ids":      batch["input_ids"],
+                "attention_mask": batch["attention_mask"],
+                "pixel_values":   batch["pixel_values"],
+                "image_grid_thw": batch["image_grid_thw"],
+            }
+            idx = batch["idx"]
+            mask = (idx == -1)
+            if mask.any():                                    
+                selected_ids = inference_inputs["input_ids"][mask]   # shape = (N, L)
+                decoded_inputs = tokenizer.batch_decode(
+                    selected_ids,
+                    skip_special_tokens=True,
+                    clean_up_tokenization_spaces=True,
+                )
+                print(decoded_inputs)
+
+            outputs = model(**inference_inputs,
+                            output_hidden_states=True,
+                            return_dict=True,
+                            use_cache=False)
+
+            hidden = outputs[2]         # == outputs[2]
+            last_idx = inference_inputs["attention_mask"].sum(-1, keepdim=True) - 1
+            rewards  = hidden.gather(-1, last_idx).squeeze(-1)        
+            rewards, idx = accelerator.gather_for_metrics((rewards, idx))
+            all_reward.extend(rewards.cpu().tolist())
+            all_input_ids.extend(idx.cpu().tolist())
+
+    assert len(all_input_ids) == len(all_reward), "数量不一致，无法一一对应保存！"
+
+    idx_reward_data = [
+        {"idx": int(idx), "reward": float(r)}
+        for idx, r in zip(all_input_ids, all_reward)
+    ]
+
+    with open(f"{training_args.output_dir}/idx_reward.jsonl", "w", encoding="utf-8") as f:
+        f.write("\n".join(json.dumps(obj, ensure_ascii=False)
+                        for obj in idx_reward_data))
+
+    print(f"[rank0] total saved {len(idx_reward_data)} examples to idx_reward.jsonl")
+

@@ -146,11 +146,11 @@ class MultiModalDataCollatorForSeq2Seq(DataCollatorForSeq2Seq):
             if self.tokenizer.padding_side == "right":
                 features[0]["input_ids"] = features[0]["input_ids"] + fake_input_ids
                 features[0]["attention_mask"] = features[0]["attention_mask"] + [0] * len(fake_input_ids)
-                features[0]["labels"] = features[0]["labels"] + [IGNORE_INDEX] * len(fake_input_ids)
+                #features[0]["labels"] = features[0]["labels"] + [IGNORE_INDEX] * len(fake_input_ids)
             else:
                 features[0]["input_ids"] = fake_input_ids + features[0]["input_ids"]
                 features[0]["attention_mask"] = [0] * len(fake_input_ids) + features[0]["attention_mask"]
-                features[0]["labels"] = [IGNORE_INDEX] * len(fake_input_ids) + features[0]["labels"]
+                #features[0]["labels"] = [IGNORE_INDEX] * len(fake_input_ids) + features[0]["labels"]
 
             batch_input_ids[0] = features[0]["input_ids"]
 
@@ -236,6 +236,31 @@ class SFTDataCollatorWith4DAttentionMask(MultiModalDataCollatorForSeq2Seq):
                 features[key] = value.to(self.compute_dtype)
 
         return features
+
+@dataclass
+class RMinference(MultiModalDataCollatorForSeq2Seq):
+    r"""Data collator for pairwise data."""
+
+    def __call__(self, features: list[dict[str, Any]]) -> dict[str, "torch.Tensor"]:
+        r"""Pad batched data to the longest sequence in the batch.
+
+        We generate 2 * n examples where the first n examples represent chosen examples and
+        the last n examples represent rejected examples.
+        """
+        concatenated_features = []
+        for feature in features:
+            target_feature = {
+                "input_ids": feature[f"input_ids"],
+                "attention_mask": feature[f"attention_mask"],
+                "label": feature["labels"],
+                "images": feature["images"],
+                "videos": feature["videos"],
+                "audios": feature["audios"],
+                "idx":feature["idx"]
+            }
+            concatenated_features.append(target_feature)
+
+        return super().__call__(concatenated_features)
 
 
 @dataclass

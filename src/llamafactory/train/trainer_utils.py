@@ -176,13 +176,14 @@ def create_reward_model(
             quantization_bit=finetuning_args.reward_model_quantization_bit,
         )
         reward_finetuning_args = FinetuningArguments()
-        tokenizer = load_tokenizer(reward_model_args)["tokenizer"]
+        tokenizer_module = load_tokenizer(reward_model_args)
+        tokenizer= tokenizer_module["tokenizer"]
         reward_model = load_model(
             tokenizer, reward_model_args, reward_finetuning_args, is_trainable=False, add_valuehead=True
         )
         logger.info_rank0(f"Loaded full weights of reward model from {finetuning_args.reward_model}")
         logger.warning_rank0("Please ensure the ppo model and reward model share SAME tokenizer and vocabulary.")
-        return reward_model
+        return tokenizer_module,tokenizer,reward_model
 
 
 def _get_decay_parameter_names(model: "PreTrainedModel") -> list[str]:
