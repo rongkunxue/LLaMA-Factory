@@ -91,20 +91,27 @@ def run_ppo(
 
     accelerator = trainer.accelerator   
     train_dataset = dataset_module["train_dataset"]
+    trainer.create_optimizer_and_scheduler(1)
+    model     = trainer.model          # 已包装好（DDP / FSDP / DeepSpeed 等）
+    optimizer = trainer.optimizer      # create_optimizer_and_scheduler 里创建好的
+    scheduler = trainer.lr_scheduler   # 如果你需要学习率调度器
 
     dataloader = DataLoader(
         train_dataset,
-        batch_size=8,
+        batch_size=1,
         collate_fn=data_collator,
-        num_workers=16,
+        num_workers=4,
         pin_memory=True,
         drop_last=False,
         shuffle=False
     )
-    model = reward_model
+    #model = reward_model
 
-    model, dataloader = accelerator.prepare(model, dataloader)
-
+    #model, dataloader = accelerator.prepare(model, dataloader)
+    model, dataloader = accelerator.prepare(
+        model,
+        dataloader,
+    )
     import json
     from tqdm import tqdm
 
@@ -123,7 +130,7 @@ def run_ppo(
                 "image_grid_thw": batch["image_grid_thw"],
             }
             idx = batch["idx"]
-            mask = (idx == -1)
+            mask = (idx == 5)
             if mask.any():                                    
                 selected_ids = inference_inputs["input_ids"][mask]   # shape = (N, L)
                 decoded_inputs = tokenizer.batch_decode(
