@@ -30,6 +30,14 @@
       "images": "images"
     }
   },
+  "product_rm":{
+    "file_name": "/mnt/bn/evalonly/eval/Inference_xrk/save/ExpResults/extracted_records.json",
+    "formatting": "sharegpt",
+    "columns": {
+      "messages": "conversations",
+      "images": "images"
+    }
+  },
   "glaive_toolcall_en_demo": {
     "file_name": "glaive_toolcall_en_demo.json",
     "formatting": "sharegpt",
